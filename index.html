@@ -3,50 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GoDEX Scanner</title>
+    <title>GoDEX Pro Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        #reader { width: 100%; max-width: 500px; border: none !important; }
-        #result { margin-top: 20px; padding: 15px; background: #333; border-radius: 8px; font-size: 1.2em; min-width: 200px; text-align: center; }
-        .controls { margin-top: 10px; }
-        button { padding: 12px 24px; background: #0088cc; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
-        /* Стилизация рамки сканера */
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: start; height: 100vh; overflow: hidden; }
+        #reader { width: 100%; max-width: 500px; background: #000; }
+        #result { margin-top: 10px; padding: 10px; background: #333; border-radius: 8px; font-size: 1.1em; width: 90%; text-align: center; border: 1px solid #444; }
+        .controls { display: flex; gap: 10px; margin-top: 15px; width: 90%; justify-content: center; }
+        button { flex: 1; padding: 15px; background: #0088cc; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; }
+        button:active { background: #006699; }
         #reader__scan_region { border: 2px solid #00ff00 !important; border-radius: 15px; }
+        /* Прячем стандартные кнопки библиотеки, так как сделаем свои */
+        #reader button { display: none; }
     </style>
 </head>
 <body>
 
     <div id="reader"></div>
-    <div id="result">Наведите на штрихкод</div>
+    <div id="result">Ожидание камеры...</div>
+
+    <div class="controls">
+        <button id="torch-button">💡 Свет</button>
+        <button id="zoom-button">🔍 Зум 2x</button>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Разворачиваем приложение на весь экран
+        tg.expand();
 
-        function onScanSuccess(decodedText, decodedResult) {
-            // Виброотклик (если поддерживается)
+        let html5QrCode = new Html5Qrcode("reader");
+        let currentZoom = 1;
+        let isTorchOn = false;
+
+        function onScanSuccess(decodedText) {
             if (navigator.vibrate) navigator.vibrate(100);
-            
-            document.getElementById('result').innerText = `Код: ${decodedText}`;
+            document.getElementById('result').innerText = `Найдено: ${decodedText}`;
             document.getElementById('result').style.color = "#00ff00";
-
-            // Мгновенная отправка данных боту
-            tg.sendData(decodedText);
+            
+            // Задержка перед отправкой, чтобы продавец увидел код
+            setTimeout(() => {
+                tg.sendData(decodedText);
+            }, 500);
         }
 
-        const html5QrCode = new Html5Qrcode("reader");
         const config = { 
-            fps: 20, 
-            qrbox: { width: 250, height: 150 }, // Прямоугольник под EAN-13
-            aspectRatio: 1.0 
+            fps: 25, 
+            qrbox: { width: 280, height: 160 }, // Оптимально для EAN-13
+            aspectRatio: 1.0,
+            // Экспериментальные настройки для улучшения фокуса
+            videoConstraints: {
+                facingMode: "environment",
+                focusMode: "continuous",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
         };
 
-        // Запуск камеры (facingMode: environment - задняя камера)
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .then(() => {
+            document.getElementById('result').innerText = "Наведите на штрихкод";
+            const track = html5QrCode.getRunningTrack();
+            const capabilities = track.getCapabilities();
+
+            // Кнопка Фонарика
+            const torchBtn = document.getElementById('torch-button');
+            if (capabilities.torch) {
+                torchBtn.addEventListener('click', () => {
+                    isTorchOn = !isTorchOn;
+                    track.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+                    torchBtn.style.background = isTorchOn ? "#ffaa00" : "#0088cc";
+                });
+            } else {
+                torchBtn.style.display = "none";
+            }
+
+            // Кнопка Зума (критично для iPhone)
+            const zoomBtn = document.getElementById('zoom-button');
+            if (capabilities.zoom) {
+                zoomBtn.addEventListener('click', () => {
+                    currentZoom = currentZoom === 1 ? 2 : 1; // Переключаем 1x / 2x
+                    track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+                    zoomBtn.innerText = `🔍 Зум ${currentZoom}x`;
+                });
+            } else {
+                zoomBtn.style.display = "none";
+            }
+        })
         .catch(err => {
-            document.getElementById('result').innerText = "Ошибка камеры: " + err;
+            document.getElementById('result').innerText = "Ошибка: " + err;
         });
     </script>
 </body>
