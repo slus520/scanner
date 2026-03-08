@@ -51,47 +51,42 @@
         const html5QrCode = new Html5Qrcode("reader");
 
         function onScanSuccess(decodedText) {
-            // 1. Останавливаем камеру сразу
             html5QrCode.stop().then(() => {
-                
-                // 2. Виброотклик (короткий)
                 if (navigator.vibrate) navigator.vibrate(100);
-                
-                // 3. Визуальный успех
-                document.body.style.backgroundColor = "#006400"; // Темно-зеленый
+                document.body.style.backgroundColor = "#006400";
                 document.getElementById('result').innerHTML = 
                     `<span style="color: #00ff00; font-size: 1.5em; font-weight: bold;">✅ ГОТОВО!<br>${decodedText}</span>`;
-
-                // 4. Отправляем код боту через 0.8 сек
-                setTimeout(() => {
-                    tg.sendData(decodedText);
-                }, 800);
-
-            }).catch(err => console.error("Stop failed", err));
+                setTimeout(() => { tg.sendData(decodedText); }, 800);
+            });
         }
 
+        // Специальные настройки для iPhone 13/15
         const config = { 
-            fps: 30, // Увеличиваем частоту для более плавного захвата
-            qrbox: { width: 260, height: 120 }, 
+            fps: 25, 
+            qrbox: { width: 220, height: 120 }, // Еще немного уменьшили рамку
             aspectRatio: 1.0,
-            // Добавляем жесткие требования к качеству картинки:
             videoConstraints: {
                 facingMode: "environment",
-                width: { min: 1280, ideal: 1920 }, // Просим Full HD
-                height: { min: 720, ideal: 1080 },
-                frameRate: { ideal: 30 }
+                // Просим меньшее разрешение, чтобы камера не "думала" слишком долго
+                width: { ideal: 1280 }, 
+                height: { ideal: 720 }
             }
         };
 
-        // Запуск с расширенными настройками
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            onScanSuccess
-        ).catch(err => {
-            // Если Full HD не поддерживается, пробуем обычный режим
-            console.log("Full HD failed, trying auto");
-            html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: { width: 250, height: 120 } }, onScanSuccess);
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .then(() => {
+            // ФИНТ ДЛЯ iPhone 13/15: Принудительно просим камеру перефокусироваться
+            const track = html5QrCode.getRunningTrack();
+            if (track && track.getCapabilities().zoom) {
+                // Устанавливаем легкий зум 1.5x — это заставляет линзу 13/15 iPhone 
+                // "проснуться" и сфокусироваться на штрихкоде
+                track.applyConstraints({
+                    advanced: [{ zoom: 1.5 }]
+                });
+            }
+        })
+        .catch(err => {
+            document.getElementById('result').innerText = "Помилка камери.";
         });
     </script>
 </body>
