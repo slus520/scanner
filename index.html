@@ -71,19 +71,27 @@
         }
 
         const config = { 
-            fps: 20, 
-            // Узкий прямоугольник (250x100) заставляет телефон фокусироваться в центре
-            qrbox: { width: 250, height: 100 },
-            aspectRatio: 1.0
+            fps: 30, // Увеличиваем частоту для более плавного захвата
+            qrbox: { width: 260, height: 120 }, 
+            aspectRatio: 1.0,
+            // Добавляем жесткие требования к качеству картинки:
+            videoConstraints: {
+                facingMode: "environment",
+                width: { min: 1280, ideal: 1920 }, // Просим Full HD
+                height: { min: 720, ideal: 1080 },
+                frameRate: { ideal: 30 }
+            }
         };
 
-        // Запуск камеры
+        // Запуск с расширенными настройками
         html5QrCode.start(
             { facingMode: "environment" }, 
             config, 
             onScanSuccess
         ).catch(err => {
-            document.getElementById('result').innerText = "Помилка камери. Перевірте дозволи.";
+            // Если Full HD не поддерживается, пробуем обычный режим
+            console.log("Full HD failed, trying auto");
+            html5QrCode.start({ facingMode: "environment" }, { fps: 20, qrbox: { width: 250, height: 120 } }, onScanSuccess);
         });
     </script>
 </body>
