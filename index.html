@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GoDEX Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #reader { width: 100%; max-width: 500px; border: none !important; }
+        #result { margin-top: 20px; padding: 15px; background: #333; border-radius: 8px; font-size: 1.2em; min-width: 200px; text-align: center; }
+        .controls { margin-top: 10px; }
+        button { padding: 12px 24px; background: #0088cc; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        /* Стилизация рамки сканера */
+        #reader__scan_region { border: 2px solid #00ff00 !important; border-radius: 15px; }
+    </style>
+</head>
+<body>
+
+    <div id="reader"></div>
+    <div id="result">Наведите на штрихкод</div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем приложение на весь экран
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Виброотклик (если поддерживается)
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            document.getElementById('result').innerText = `Код: ${decodedText}`;
+            document.getElementById('result').style.color = "#00ff00";
+
+            // Мгновенная отправка данных боту
+            tg.sendData(decodedText);
+        }
+
+        const html5QrCode = new Html5Qrcode("reader");
+        const config = { 
+            fps: 20, 
+            qrbox: { width: 250, height: 150 }, // Прямоугольник под EAN-13
+            aspectRatio: 1.0 
+        };
+
+        // Запуск камеры (facingMode: environment - задняя камера)
+        html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
+        .catch(err => {
+            document.getElementById('result').innerText = "Ошибка камеры: " + err;
+        });
+    </script>
+</body>
+</html>
