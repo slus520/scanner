@@ -1,102 +1,52 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zebra Laser Pro</title>
+    <title>GoDEX Scanner</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { 
-            font-family: sans-serif; margin: 0; padding: 0; 
-            background-color: #000; color: white; 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            height: 100vh; overflow: hidden;
-        }
-        #reader { width: 100%; max-width: 500px; position: relative; }
-        
-        /* ТОТ САМЫЙ ЛАЗЕР: Рисуем его поверх камеры */
-        .laser-line {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 280px;
-            height: 2px;
-            background-color: #ff0000;
-            box-shadow: 0 0 10px #ff0000, 0 0 5px #ff0000;
-            z-index: 100;
-            pointer-events: none; /* Чтобы линия не мешала нажатиям */
-        }
-
-        .laser-box {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 280px;
-            height: 80px;
-            border: 1px solid rgba(255, 0, 0, 0.3);
-            z-index: 99;
-            pointer-events: none;
-        }
-
-        #result { 
-            position: absolute; bottom: 50px;
-            padding: 15px; text-align: center; 
-            font-size: 1.2em; z-index: 101; width: 100%;
-        }
-
-        /* Скрываем мусор от библиотеки */
-        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
-        #reader__scan_region { border: none !important; }
+        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #reader { width: 100%; max-width: 500px; border: none !important; }
+        #result { margin-top: 20px; padding: 15px; background: #333; border-radius: 8px; font-size: 1.2em; min-width: 200px; text-align: center; }
+        .controls { margin-top: 10px; }
+        button { padding: 12px 24px; background: #0088cc; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        /* Стилизация рамки сканера */
+        #reader__scan_region { border: 2px solid #00ff00 !important; border-radius: 15px; }
     </style>
 </head>
 <body>
 
-    <div id="reader">
-        <div class="laser-box"></div>
-        <div class="laser-line"></div>
-    </div>
-    
-    <div id="result">Відсуньте телефон на 30 см</div>
+    <div id="reader"></div>
+    <div id="result">Наведите на штрихкод</div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand();
+        tg.expand(); // Разворачиваем приложение на весь экран
 
-        const html5QrCode = new Html5Qrcode("reader");
+        function onScanSuccess(decodedText, decodedResult) {
+            // Виброотклик (если поддерживается)
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            document.getElementById('result').innerText = `Код: ${decodedText}`;
+            document.getElementById('result').style.color = "#00ff00";
 
-        function onScanSuccess(decodedText) {
-            html5QrCode.stop().then(() => {
-                if (navigator.vibrate) navigator.vibrate(100);
-                document.body.style.backgroundColor = "#004d00";
-                document.getElementById('result').innerHTML = `<b style="color: #00ff00; font-size: 1.5em;">✅ ЗЧИТАНО:<br>${decodedText}</b>`;
-                setTimeout(() => { tg.sendData(decodedText); }, 600);
-            });
+            // Мгновенная отправка данных боту
+            tg.sendData(decodedText);
         }
 
+        const html5QrCode = new Html5Qrcode("reader");
         const config = { 
-            fps: 30, 
-            qrbox: { width: 280, height: 80 },
-            aspectRatio: 1.0,
-            videoConstraints: {
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
+            fps: 20, 
+            qrbox: { width: 250, height: 150 }, // Прямоугольник под EAN-13
+            aspectRatio: 1.0 
         };
 
+        // Запуск камеры (facingMode: environment - задняя камера)
         html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess)
-        .then(() => {
-            const track = html5QrCode.getRunningTrack();
-            const capabilities = track.getCapabilities();
-            
-            // Принудительный зум для фокуса на iPhone 13/15
-            if (capabilities.zoom) {
-                track.applyConstraints({ advanced: [{ zoom: 2.0 }] });
-            }
+        .catch(err => {
+            document.getElementById('result').innerText = "Ошибка камеры: " + err;
         });
     </script>
 </body>
