@@ -3,42 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Zebra Laser Scanner</title>
+    <title>Zebra Laser Pro</title>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { 
-            font-family: sans-serif; 
-            margin: 0; padding: 0; 
-            background-color: #000; 
-            color: white; 
+            font-family: sans-serif; margin: 0; padding: 0; 
+            background-color: #000; color: white; 
             display: flex; flex-direction: column; 
             align-items: center; justify-content: center; 
             height: 100vh; overflow: hidden;
-            transition: background-color 0.2s;
         }
-        #reader { width: 100%; max-width: 500px; }
+        #reader { width: 100%; max-width: 500px; position: relative; }
+        
+        /* ТОТ САМЫЙ ЛАЗЕР: Рисуем его поверх камеры */
+        .laser-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 2px;
+            background-color: #ff0000;
+            box-shadow: 0 0 10px #ff0000, 0 0 5px #ff0000;
+            z-index: 100;
+            pointer-events: none; /* Чтобы линия не мешала нажатиям */
+        }
+
+        .laser-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px;
+            height: 80px;
+            border: 1px solid rgba(255, 0, 0, 0.3);
+            z-index: 99;
+            pointer-events: none;
+        }
+
         #result { 
-            margin-top: 20px; 
-            padding: 10px; 
-            text-align: center; 
-            font-size: 1.2em;
-            z-index: 10;
+            position: absolute; bottom: 50px;
+            padding: 15px; text-align: center; 
+            font-size: 1.2em; z-index: 101; width: 100%;
         }
-        /* Узкая рамка-луч как у настоящего сканера */
-        #reader__scan_region { 
-            border: 2px solid #ff0000 !important; 
-            border-radius: 4px;
-            box-shadow: 0 0 15px #ff0000;
-        }
-        /* Прячем лишние элементы интерфейса библиотеки */
-        #reader__dashboard, img, button { display: none !important; }
+
+        /* Скрываем мусор от библиотеки */
+        #reader__dashboard, #reader__status_span, video + div { display: none !important; }
+        #reader__scan_region { border: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="reader"></div>
-    <div id="result">Тримайте телефон далі (30-40 см)</div>
+    <div id="reader">
+        <div class="laser-box"></div>
+        <div class="laser-line"></div>
+    </div>
+    
+    <div id="result">Відсуньте телефон на 30 см</div>
 
     <script>
         const tg = window.Telegram.WebApp;
@@ -47,24 +69,17 @@
         const html5QrCode = new Html5Qrcode("reader");
 
         function onScanSuccess(decodedText) {
-            // Мгновенная остановка
             html5QrCode.stop().then(() => {
                 if (navigator.vibrate) navigator.vibrate(100);
-                
                 document.body.style.backgroundColor = "#004d00";
-                document.getElementById('result').innerHTML = 
-                    `<b style="color: #00ff00; font-size: 1.4em;">✅ ЗЧИТАНО:<br>${decodedText}</b>`;
-
-                setTimeout(() => {
-                    tg.sendData(decodedText);
-                }, 700);
-            }).catch(err => console.error(err));
+                document.getElementById('result').innerHTML = `<b style="color: #00ff00; font-size: 1.5em;">✅ ЗЧИТАНО:<br>${decodedText}</b>`;
+                setTimeout(() => { tg.sendData(decodedText); }, 600);
+            });
         }
 
         const config = { 
             fps: 30, 
-            // Узкая полоска: ширина 280, высота всего 60
-            qrbox: { width: 280, height: 60 },
+            qrbox: { width: 280, height: 80 },
             aspectRatio: 1.0,
             videoConstraints: {
                 facingMode: "environment",
@@ -78,15 +93,10 @@
             const track = html5QrCode.getRunningTrack();
             const capabilities = track.getCapabilities();
             
-            // Принудительный зум 2.0x — решение проблемы фокуса 13/15 iPhone
+            // Принудительный зум для фокуса на iPhone 13/15
             if (capabilities.zoom) {
-                track.applyConstraints({
-                    advanced: [{ zoom: 2.0 }]
-                }).catch(e => console.log("Zoom error:", e));
+                track.applyConstraints({ advanced: [{ zoom: 2.0 }] });
             }
-        })
-        .catch(err => {
-            document.getElementById('result').innerText = "Помилка камери";
         });
     </script>
 </body>
